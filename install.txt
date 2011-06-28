@@ -1,0 +1,153 @@
+* 1/ Installing the DVdongle:
+
+- insert the DVdongle in a free USB-port of the repeater-PC
+
+- Verify that the controller-PC detects the dongle:
+(as root), do the command "lsusb"
+
+A line with the following text should be displayed:
+ID 0403:6001 Future Technology Devices International, Ltd FT232 USB-Serial (UART) IC
+
+- Verify that the linux-kernel detects and recognises the device:
+(as root), do the command "dmesg".
+
+The following messages should be displayed:
+
+ftdi_sio 2-1:1.0: FTDI USB Serial Device converter detected
+drivers/usb/serial/ftdi_sio.c: Detected FT232BM
+usb 2-1: FTDI USB Serial Device converter now attached to ttyUSB0
+usbcore: registered new driver ftdi_sio
+drivers/usb/serial/ftdi_sio.c: v1.4.3:USB FTDI Serial Converters Driver
+
+
+- Verify that the device-interface file is created.
+(as root), do the command "ls -l /dev/ttyUSB0"
+
+
+* 2/ Install the necessairy software:
+
+(the following actions need to be done as root)
+
+2a: "libsndfile" (libraries and tools used to import .wav files)
+
+As this package is not present in the default repositories of CentOS, it is not possible to install this package via "yum". Hence, the this package needs to be installed from source:
+
+- locate the source-code and latest software version on the webpage of sndfile.
+http://www.mega-nerd.com/libsndfile/#Download
+
+At the time of writing of this document (end november 2010), the latest
+version of this software was 1.0.23
+
+- Download the latest source-file to the repeater:
+(for version 1.0.23)
+-> wget http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.23.tar.gz
+
+- unzip and extract
+(for version 1.0.23)
+-> tar zxvf libsndfile-1.0.23.tar.gz
+
+- compile and install:
+-> cd libsndfile-1.0.23
+-> ./configure --prefix=/usr
+Do NOT forget this option, as otherwize the package will be installed under /usr/local/... and CentOS will not find find it!
+-> make
+-> make test
+(if all tests OK)
+-> make install
+
+
+2b: the voice-announcement software:
+- locate the source-code on http://villazeebries.krbonne.net/hamstuff/
+
+- download the latest source-file:
+(in this case, version 0.2.1)
+-> wget http://villazeebries.krbonne.net/dstar/voice-announce/voice-announce-0.2.1.tar.gz
+
+- unzip and extract
+-> tar zxvf voice-announce-0.2.1.tar.gz
+
+- compile and install
+-> cd voice-announce-0.2.1
+-> make
+-> make install
+
+
+* 2bis/ Install other software (not necessairy, but helpfull)
+
+- sox: audio file-conversion software
+-> yum install sox
+
+- festival: text-to-speech software
+-> tum install festival
+
+
+
+* 3/ Makeing it secure.
+
+The voice-announcement system has been specifically designed so it does
+NOT have to run as root to operate.
+
+It is very much adviced to create a seperate (non-root) user, to
+insure the security of the repeater-system.
+
+For this example, a user called "voiceann" is created:
+
+- create a user for voice-announcement:
+-> mkuser voiceann
+
+- set a password:
+-> passwd voiceann
+
+- set privileges to DVdongle:
+Step 1: verify group-ownership of the DVdongle device-file
+-> stat /dev/ttyUSB0 | grep Gid
+
+This should return a line like this:
+"Access: (0660/crw-rw----)  Uid: (    0/    root)   Gid: (   14/    uucp)"
+
+This means that /dev/ttyUSB0 is owned by the group "uucp".
+
+Step 2: add voice-announcement user to that group
+-> usermod -a -G uucp voiceann
+
+Step 3: verify it:
+-> groups voiceann
+
+This should return a line simular to this:
+voiceann : voiceann uucp
+
+
+* 4/ testing it:
+
+- log in as "voice-announcement" user
+
+- create wave-file:
+-> echo "TEST REPEATER VOICE-ANNOUNCEMENT" | text2wave -F 8000 -o msg.wav
+
+4a: using Dplus
+- convert wave-file to dvtool-file, adding text-message
+-> wav2ambe -v -t "TEXT MESSAGE" -f d -o msg.dvtool msg.wav
+
+- send it to Dplus for play-out:
+-> cp2dpl <module> msg.dvtool
+
+
+4b: using wavstream for direct play-out:
+-> wavstream -v -t "TEXT MESSAGE" <repeatername> <module> msg.wav
+
+For people using repeatersoftware that does not listen to IP-address
+127.0.0.1 for inbound traffic
+
+- find the IP-address of your eth0 interface
+-> ip -4 addr list dev eth0
+You should see a line line this
+"inet 192.168.100.10/24 brd ..."
+
+- use wavstream, pointing to that address:
+-> wavstream -v -i 192.168.100.10 -t "TEXT MESSAGE" <repeatername> <module> msg.wav
+
+
+
+Have fun!
+73
+Kristoff ON1ARF
