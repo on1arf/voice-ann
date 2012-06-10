@@ -223,6 +223,7 @@ overruns/underruns
 22 nov. 2010: version 0.1.1: wavstream and add support for text-message announcements
 3  Jan. 2011: version 0.1.2: support for text-messages in ambe2dvtool and dvtool2ambe, added: dvtooltext and ambe2wav, improved CLI-options and static-build executable
 27 Mar. 2011: Version 0.2.1: ambestream, support for DNS lookups, ipv6, auto-break, dextra linking
+21 May  2012: version 0.2.2: source ip address
 
 73
 Kristoff ON1ARF

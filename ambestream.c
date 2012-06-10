@@ -27,8 +27,9 @@
 //  release info:
 // 27 jan. 2011: version 0.1.3. Initial release (internal release, not published)
 // 27 mar. 2011: version 0.2.1. dextra support, auto-break support, code-cleanup, dns-resolution, ipv6 support
+// 22 may  2012: version 0.2.2. Add option to configure source ip address
 
-#define VERSION "0.2.1"
+#define VERSION "0.2.2"
 
 
 // define used to differenciate code in s_udpsend of ambestream and wavstream
@@ -170,6 +171,7 @@ char * destination=NULL;
 
 int ipv4only;
 int ipv6only;
+int v4orv6;
 
 int linktodextra;
 
@@ -197,9 +199,12 @@ global.destport=0;
 mycallin=NULL;
 linktodextra=0;
 memset(global.mycall,' ',6);
+global.sourceip=NULL;
+global.sourceip_addr=NULL;
 
 ipv4only=0;
 ipv6only=0;
+v4orv6=-1;
 
 global.breakinterval=0;		// breakinterval is 0 (no break)
 global.breaklength=200;		// break is 4 seconds. Setting this value to less then 100
@@ -280,6 +285,12 @@ for (paramloop=1;paramloop<argc;paramloop++) {
 			global.breakrepeat=atoi(argv[paramloop]);
 			breakrepeatstrin=argv[paramloop];
 		}; // end if
+	} else if (strcmp(thisarg,"-si") == 0) {
+	// -si = source ip
+		if (paramloop+1 < argc) {
+			paramloop++;
+			global.sourceip=argv[paramloop];
+		}; // end if
 	} else {
 	// argument without option is input filename
 		infilelist[numinputfile]=thisarg;
@@ -336,6 +347,8 @@ if (global.module == 0) {
 	usage(argv[0]);
 	exit(-1);
 }; // end if
+
+
 
 // check destination port. Has been extraced using a "atoi" (convert string
 // to number) function, but was if a valid string?
@@ -457,6 +470,22 @@ if ((info->ai_next != NULL) || global.verboselevel >= 1) {
 // store address info for "s_udpsend" function
 global.ai_addr=info->ai_addr;
 
+// open a UDP socket and store information in the global data structure
+if (info->ai_family == AF_INET) {
+	// ipv4
+	v4orv6=0;
+	global.udpsd=socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
+} else {
+	// ipv6
+	v4orv6=1;
+	global.udpsd=socket(AF_INET6,SOCK_DGRAM,IPPROTO_UDP);
+}; // end else - if
+
+if (global.udpsd < 0) {
+	fprintf(stderr,"Error: could not create udp socket! Exiting!\n");
+	exit(-1);
+}; // end if
+
 
 // check "break" values
 if (breakintervalstrin != NULL) {
@@ -534,8 +563,14 @@ if (mycallin != NULL) {
 		exit(-1);
 	}; // end if
 
+	// copy mycallin to mycall, making uppercase if possible
+	{
+		int l;
 
-	memcpy(global.mycall,mycallin,calllen);
+		for (l=0; l<calllen; l++) {
+			global.mycall[l]=toupper(mycallin[l]);
+		}; // end for
+	}; // end 
 
 } else {
 	// mycall is mandatory when the -x option is set
@@ -557,12 +592,98 @@ if (mycallin != NULL) {
 // we will open is as IPv6, so it can be used for both ipv4 and ipv6
 
 
-// open a UDP socket and store information in the global data structure
-global.udpsd=socket(AF_INET6,SOCK_DGRAM,0);
+// bind IP-address to source IP-address
 
-if (global.udpsd < 0) {
-	fprintf(stderr,"Error: could not create udp socket! Exiting!\n");
-	exit(-1);
+if (global.sourceip) {
+	int ret;
+	struct addrinfo *si_hint, *si_info;
+
+	// allocated memory for "sockaddr" structure for sourceip in global data structure
+	global.sourceip_addr=malloc(sizeof(struct sockaddr_in));
+
+	if (!global.sourceip_addr) {
+		fprintf(stderr,"Internal Error: malloc failed for global.si_addr!\n");
+		exit(-1);
+	}; // end if
+
+	// allocate memory for hint
+	si_hint=malloc(sizeof(struct addrinfo));
+
+	if (si_hint == NULL) {
+		fprintf(stderr,"Internal Error: malloc failed for hint!\n");
+		exit(-1);
+	}; // end if
+
+	// clear hint
+	memset(si_hint,0,sizeof(si_hint));
+
+	si_hint->ai_socktype = SOCK_DGRAM;
+
+
+	if (v4orv6) {
+	   si_hint->ai_family = AF_INET6;
+	} else {
+		si_hint->ai_family = AF_INET;
+	}; // end if
+
+	// do DNS-query, use getaddrinfo for both ipv4 and ipv6 support
+	ret=getaddrinfo(global.sourceip, NULL, si_hint, &si_info);
+
+	if (ret != 0) {
+		fprintf(stderr,"Error: cannot resolve local ip-address %s: (%s)\n",global.sourceip,gai_strerror(ret));
+		exit(-1);
+	}; // end if
+
+	// getaddrinfo can return multiple results, we only use the first one
+
+	// give warning is more then one result found.
+	// Data is returned in info as a linked list
+	// If the "next" pointer is not NULL, there is more then one
+	// element in the chain
+
+	if ((si_info->ai_next != NULL) || global.verboselevel >= 1) {
+	        char ipaddrtxt[INET6_ADDRSTRLEN];
+
+
+	        // get ip-address in numeric form
+	        if (si_info->ai_family == AF_INET) {
+	        	// ipv4
+				struct sockaddr_in *sin;
+				sin = (struct sockaddr_in *) si_info->ai_addr;
+				inet_ntop(AF_INET,&sin->sin_addr,ipaddrtxt,INET6_ADDRSTRLEN);
+	        } else {
+				// ipv6
+	        	struct sockaddr_in6 *sin;
+	        	sin = (struct sockaddr_in6 *) si_info->ai_addr;
+	        	inet_ntop(AF_INET6,&sin->sin6_addr,ipaddrtxt,INET6_ADDRSTRLEN);
+	        }; // end else - if
+
+	        if (si_info->ai_next != NULL) {
+				fprintf(stderr,"Warning. Multiple ip addresses found for local address %s. Using %s\n",destination,ipaddrtxt);
+	        } else {
+	        	fprintf(stderr,"Using local ip-address %s\n",ipaddrtxt);
+	        }; // end if
+	}; // end if
+
+	global.sourceip_addr=(struct sockaddr_in *) si_info->ai_addr;
+
+	if (si_info->ai_family == AF_INET) {
+		ret=bind(global.udpsd,(const struct sockaddr *) global.sourceip_addr, sizeof(struct sockaddr_in));
+		if (ret < 0) {
+			fprintf(stderr,"Could not bind to local address %s: error %d (%s)\n",global.sourceip,errno,strerror(errno));
+		}; // end if
+
+	} else {
+		ret=bind(global.udpsd,(const struct sockaddr *) global.sourceip_addr, sizeof(struct sockaddr_in6));
+		if (ret < 0) {
+			fprintf(stderr,"Could not bind to local address %s: error %d (%s)\n",global.sourceip,errno,strerror(errno));
+		}; // end if
+
+	}; // end if
+	// free memory
+	free(si_hint);
+} else {
+	// no source IP address given: just create socket
 }; // end if
 
 

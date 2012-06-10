@@ -3,7 +3,7 @@
 // wavstream: convert wav-files to .ambe-files and stream it out
 // via a udp-stream to the local repeater, a remote repeater or a
 // X-reflector
-// Usage: wavstream [-t broadcasttext] [-dngl device] [-v] [-4] [-6] [-d ipaddress ] [-p port] [-my CALLSIGN] [-bi break-interval] [-bl break-length] [-br break-repeat] name-of-repeater module infile.wav [ infile.wav ....]
+// Usage: wavstream [-si sourceip] [-t broadcasttext] [-dngl device] [-v] [-4] [-6] [-d ipaddress ] [-p port] [-my CALLSIGN] [-bi break-interval] [-bl break-length] [-br break-repeat] name-of-repeater module infile.wav [ infile.wav ....]
 // Use filename "-" for reading from standard in
 
 // this program requires a DVdongle to do AMBE encoding, connected to
@@ -29,15 +29,16 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program; if not, write to the Free Software
  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-*/
+ */
 
 //  release info:
 // 17 okt. 2010: version 0.0.1. Initial release
 // 7  nov. 2010: version 0.0.4. Multithreaded release
 // 4  jan. 2011: Version 0.1.3. CLI-options via "-", donglelocation, verboselevel, destination ip-address/port, multiple input files
 // 27 Mar. 2011: version 0.2.1. CLI-options in line with other applications, dextra, read from stdin, auto-break, DNS-resolution, ipv6
+// 21 May  2012: version 0.2.2 Add option to configure source ip address
 
-#define VERSION "0.2.1"
+#define VERSION "0.2.2"
 
 // define used to differenciate code in s_udpsend of ambestream and wavstream
 #define WAVSTREAM 1
@@ -152,234 +153,247 @@ int main(int argc,char** argv) {
 
 
 
-// data structures:
+		  // data structures:
 
-// termios: structure to configure serial port
-struct termios tio;
-
-
-
-// in-buffer for serial port: packets can be up to 8192 bytes
-unsigned char serialinbuff[8192];
-
-// SNDFILE: vars for library to read wave-files
-SNDFILE * infile;
-SF_INFO sfinfo;
-
-
-// posix threads
-pthread_t thr_serialreceive;
-
-
-// vars for timed interrupts
-struct sigaction sa1, sa2, sa3;
-struct sigevent sev1, sev2, sev3;
-timer_t timerid1, timerid2, timerid3;
-struct itimerspec its1, its2, its3;
-
-// some miscellaneous vars:
-int status;
-int stop;
-int framecount;
-int filecount;
-int numinputfile;
-
-
-char * modulein;
-
-// we can encode up to "MAXINFILE" files at one
-char * infilelist[MAXINFILE];
-
-
-// var used for all kind of tempory data
-int ret;
-int repnamesize;
-int paramloop;
-int fileloop;
-char * destportstrin=NULL;
-char * destinationin=NULL;
-
-char * destination=NULL; // destination is local as we copy the 
-// ai_addr to the global data structure
-char * mycallin=NULL;
-
-char * breakintervalstrin=NULL; char breakintervalstr[10];
-char * breaklengthstrin=NULL; char breaklengthstr[10];
-char * breakrepeatstrin=NULL; char breakrepeatstr[10];
-
-// vars for getaddrinfo
-struct addrinfo *hint, *info;
+		  // termios: structure to configure serial port
+		  struct termios tio;
 
 
 
-int linktodextra;
-int ipv4only;
-int ipv6only;
+		  // in-buffer for serial port: packets can be up to 8192 bytes
+		  unsigned char serialinbuff[8192];
 
-// ////// data definition done ///
-
-
-// main program starts here ///
-// part 1: initialise vars and check cli-arguments
-// Usage: wavstream [-t broadcasttext] [-dngl device] [-v] [-4] [-6] [-d ipaddress ] [-p port] [-my CALLSIGN] [-bi break-interval] [-bl break-length] [-br break-repeat] name-of-repeater module infile.wav [ infile.wav ....]
-
-global.verboselevel=0;
-dongledevice=defaultdongledevice;
-global.bcmsg=NULL;
-numinputfile=0;
-destinationin=NULL;
-global.destport=0;
-linktodextra=0;
-
-ipv4only=0;
-ipv6only=0;
+		  // SNDFILE: vars for library to read wave-files
+		  SNDFILE * infile;
+		  SF_INFO sfinfo;
 
 
-global.breakinterval=0;		// breakinterval is 0 (no break)
-global.breaklength=200;		// break is 4 seconds. Setting this value to less then 100
-							// (2 seconds) is not a good idea as some icom-repeaters
-							// will have problems starting the new stream if it
-							// started to quickly after the previous one has ended
-global.breakrepeat=MAXBREAKREPEAT;
+		  // posix threads
+		  pthread_t thr_serialreceive;
+
+
+		  // vars for timed interrupts
+		  struct sigaction sa1, sa2, sa3;
+		  struct sigevent sev1, sev2, sev3;
+		  timer_t timerid1, timerid2, timerid3;
+		  struct itimerspec its1, its2, its3;
+
+		  // some miscellaneous vars:
+		  int status;
+		  int stop;
+		  int framecount;
+		  int filecount;
+		  int numinputfile;
+
+
+		  char * modulein;
+
+		  // we can encode up to "MAXINFILE" files at one
+		  char * infilelist[MAXINFILE];
+
+
+		  // var used for all kind of tempory data
+		  int ret;
+		  int repnamesize;
+		  int paramloop;
+		  int fileloop;
+
+		  char * destportstrin=NULL;
+		  char * destinationin=NULL;
+
+		  char * destination=NULL; // destination is local as we copy the 
+		  // ai_addr to the global data structure
+		  char * mycallin=NULL;
+
+		  char * breakintervalstrin=NULL; char breakintervalstr[10];
+		  char * breaklengthstrin=NULL; char breaklengthstr[10];
+		  char * breakrepeatstrin=NULL; char breakrepeatstr[10];
+
+		  // vars for getaddrinfo
+		  struct addrinfo *hint, *info;
+
+		  struct sockaddr_in * sourceip_addr;
+
+		  int linktodextra;
+		  int ipv4only;
+		  int ipv6only;
+		  int v4orv6;
+
+		  // ////// data definition done ///
+
+
+		  // main program starts here ///
+		  // part 1: initialise vars and check cli-arguments
+		  // Usage: wavstream [-t broadcasttext] [-dngl device] [-v] [-4] [-6] [-d ipaddress ] [-p port] [-my CALLSIGN] [-bi break-interval] [-bl break-length] [-br break-repeat] name-of-repeater module infile.wav [ infile.wav ....]
+
+		  global.verboselevel=0;
+		  dongledevice=defaultdongledevice;
+		  global.bcmsg=NULL;
+		  numinputfile=0;
+		  destinationin=NULL;
+		  global.destport=0;
+		  linktodextra=0;
+
+		  ipv4only=0;
+		  ipv6only=0;
+		  v4orv6=-1;
 
 
 
-// start of program //
+		  global.breakinterval=0;		// breakinterval is 0 (no break)
+		  global.breaklength=200;		// break is 4 seconds. Setting this value to less then 100
+		  // (2 seconds) is not a good idea as some icom-repeaters
+		  // will have problems starting the new stream if it
+		  // started to quickly after the previous one has ended
+		  global.breakrepeat=MAXBREAKREPEAT;
 
-// analysing CLI parameters //
-for (paramloop=1;paramloop<argc;paramloop++) {
-	char * thisarg=argv[paramloop];
-
-	if (strcmp(thisarg,"-t") == 0) {
-	// -t = broadcasttext
-		if (paramloop+1 < argc) {
-			paramloop++;
-			global.bcmsg=argv[paramloop];
-		}; // end if
-	} else if (strcmp(thisarg,"-V") == 0) {
-	// -V = Version
-		fprintf(stderr,"wavstream version %s\n",VERSION);
-		exit(0);
-	} else if (strcmp(thisarg,"-dngl") == 0) {
-	// -d = dongledevice
-		if (paramloop+1 < argc) {
-			paramloop++;
-			dongledevice=argv[paramloop];
-		}; // end if
-	} else if (strcmp(thisarg,"-v") == 0) {
-	// -v = verbose
-		global.verboselevel++;
-	} else if (strcmp(thisarg,"-h") == 0) {
-	// -h = help
-		help(argv[0]);
-		exit(0);
-	} else if (strcmp(thisarg,"-dxl") == 0) {
-	// -dxl = dextra protocol
-		linktodextra=1;
-	} else if ((strcmp(thisarg,"-i") == 0) || (strcmp(thisarg,"-d") == 0)) {
-	// -i = ipaddr (being depreciated) -d = destination
-		if (paramloop+1 < argc) {
-			paramloop++;
-			destinationin=argv[paramloop];
-		}; // end if
-	} else if (strcmp(thisarg,"-4") == 0) {
-	// -4 = force ipv4 only
-		ipv4only=1;
-	} else if (strcmp(thisarg,"-6") == 0) {
-	// -6 = force ipv6 only
-		ipv6only=1;
-	} else if (strcmp(thisarg,"-p") == 0) {
-	// -p = ip port
-		if (paramloop+1 < argc) {
-			paramloop++;
-			global.destport=atoi(argv[paramloop]);
-			destportstrin=argv[paramloop];
-		}; // end if
-	} else if (strcmp(thisarg,"-my") == 0) {
-	// -M = my call
-		if (paramloop+1 < argc) {
-			paramloop++;
-			mycallin=argv[paramloop];
-		}; // end if
-	} else if (strcmp(thisarg,"-bi") == 0) {
-	// -bi = break interval
-		if (paramloop+1 < argc) {
-			paramloop++;
-			global.breakinterval=atoi(argv[paramloop]);
-			breakintervalstrin=argv[paramloop];
-		}; // end if
-	} else if (strcmp(thisarg,"-bl") == 0) {
-	// -bl = break length
-		if (paramloop+1 < argc) {
-			paramloop++;
-			global.breaklength=atoi(argv[paramloop]);
-			breaklengthstrin=argv[paramloop];
-		}; // end if
-	} else if (strcmp(thisarg,"-br") == 0) {
-	// -br = break repeat
-		if (paramloop+1 < argc) {
-			paramloop++;
-			global.breakrepeat=atoi(argv[paramloop]);
-			breakrepeatstrin=argv[paramloop];
-		}; // end if
-	} else {
-	// argument without option is input filename
-		infilelist[numinputfile]=thisarg;
-
-		if (numinputfile < MAXINFILE - 1) {
-			numinputfile++;
-		}; // end if
-	}; // end else - elsif - elsif - elsif - elsif - if
-
-}; // end for
+		  global.sourceip=NULL;
+		  sourceip_addr=NULL;
 
 
-// the name of the repeater and the module-name are now in first two fields of the input files
-// extract them
+		  // start of program //
 
-// but first check if we have sufficient parameters
-if (numinputfile <= 2) {
-	fprintf(stderr,"Error: Unsufficient number of parameters!\n");
-	usage(argv[0]);
-	exit(-1);
-}; // end if
+		  // analysing CLI parameters //
+		  for (paramloop=1;paramloop<argc;paramloop++) {
+					 char * thisarg=argv[paramloop];
 
-// now extract name-of-repeater and module
+					 if (strcmp(thisarg,"-t") == 0) {
+								// -t = broadcasttext
+								if (paramloop+1 < argc) {
+										  paramloop++;
+										  global.bcmsg=argv[paramloop];
+								}; // end if
+					 } else if (strcmp(thisarg,"-V") == 0) {
+								// -V = Version
+								fprintf(stderr,"wavstream version %s\n",VERSION);
+								exit(0);
+					 } else if (strcmp(thisarg,"-dngl") == 0) {
+								// -d = dongledevice
+								if (paramloop+1 < argc) {
+										  paramloop++;
+										  dongledevice=argv[paramloop];
+								}; // end if
+					 } else if (strcmp(thisarg,"-v") == 0) {
+								// -v = verbose
+								global.verboselevel++;
+					 } else if (strcmp(thisarg,"-h") == 0) {
+								// -h = help
+								help(argv[0]);
+								exit(0);
+					 } else if (strcmp(thisarg,"-si") == 0) {
+								// -si = source ip
+								if (paramloop+1 < argc) {
+										  paramloop++;
+										  global.sourceip=argv[paramloop];
+								}; // end if
+					 } else if (strcmp(thisarg,"-dxl") == 0) {
+								// -dxl = dextra protocol
+								linktodextra=1;
+					 } else if ((strcmp(thisarg,"-i") == 0) || (strcmp(thisarg,"-d") == 0)) {
+								// -i = ipaddr (being depreciated) -d = destination
+								if (paramloop+1 < argc) {
+										  paramloop++;
+										  destinationin=argv[paramloop];
+								}; // end if
+					 } else if (strcmp(thisarg,"-4") == 0) {
+								// -4 = force ipv4 only
+								ipv4only=1;
+					 } else if (strcmp(thisarg,"-6") == 0) {
+								// -6 = force ipv6 only
+								ipv6only=1;
+					 } else if (strcmp(thisarg,"-p") == 0) {
+								// -p = ip port
+								if (paramloop+1 < argc) {
+										  paramloop++;
+										  global.destport=atoi(argv[paramloop]);
+										  destportstrin=argv[paramloop];
+								}; // end if
+					 } else if (strcmp(thisarg,"-my") == 0) {
+								// -M = my call
+								if (paramloop+1 < argc) {
+										  paramloop++;
+										  mycallin=argv[paramloop];
+								}; // end if
+					 } else if (strcmp(thisarg,"-bi") == 0) {
+								// -bi = break interval
+								if (paramloop+1 < argc) {
+										  paramloop++;
+										  global.breakinterval=atoi(argv[paramloop]);
+										  breakintervalstrin=argv[paramloop];
+								}; // end if
+					 } else if (strcmp(thisarg,"-bl") == 0) {
+								// -bl = break length
+								if (paramloop+1 < argc) {
+										  paramloop++;
+										  global.breaklength=atoi(argv[paramloop]);
+										  breaklengthstrin=argv[paramloop];
+								}; // end if
+					 } else if (strcmp(thisarg,"-br") == 0) {
+								// -br = break repeat
+								if (paramloop+1 < argc) {
+										  paramloop++;
+										  global.breakrepeat=atoi(argv[paramloop]);
+										  breakrepeatstrin=argv[paramloop];
+								}; // end if
+					 } else {
+								// argument without option is input filename
+								infilelist[numinputfile]=thisarg;
 
-// copy epeatername to global var, maximum 6 characters
-// without terminating \n
-memset(global.repeatername,' ',6);
+								if (numinputfile < MAXINFILE - 1) {
+										  numinputfile++;
+								}; // end if
+					 }; // end else - elsif - elsif - elsif - elsif - if
 
-repnamesize=strlen(infilelist[0]);
-if (repnamesize>6) {
-	repnamesize=6;
-}; // end if
-memcpy(global.repeatername,infilelist[0],repnamesize);
+		  }; // end for
 
-modulein=infilelist[1];
 
-// check first character, if 'a' or 'A' -> module is 1
-if ((modulein[0] == 'a') || (modulein[0] == 'A')) {
-	global.module=0x41; // ascii 'A'
-}; // end if
+		  // the name of the repeater and the module-name are now in first two fields of the input files
+		  // extract them
 
-// check first character, if 'b' or 'B' -> module is 2
-if ((modulein[0] == 'b') || (modulein[0] == 'B')) {
-	global.module=0x42; // ascii 'B'
-}; // end if
+		  // but first check if we have sufficient parameters
+		  if (numinputfile <= 2) {
+					 fprintf(stderr,"Error: Unsufficient number of parameters!\n");
+					 usage(argv[0]);
+					 exit(-1);
+		  }; // end if
 
-// check first character, if 'c' or 'C' -> module is 3
-if ((modulein[0] == 'c') || (modulein[0] == 'C')) {
-	global.module=0x43; // ascii 'C'
-}; // end if
+		  // now extract name-of-repeater and module
 
-if (global.module == 0) {
-	fprintf(stderr,"Error: module must be 'a', 'b' or 'c'\n");
-	usage(argv[0]);
-	exit(-1);
-}; // end if
+		  // copy epeatername to global var, maximum 6 characters
+		  // without terminating \n
+		  memset(global.repeatername,' ',6);
 
-// check destination port. Has been extracted using a "atoi" (convert string
+		  repnamesize=strlen(infilelist[0]);
+		  if (repnamesize>6) {
+					 repnamesize=6;
+		  }; // end if
+		  memcpy(global.repeatername,infilelist[0],repnamesize);
+
+		  modulein=infilelist[1];
+
+		  // check first character, if 'a' or 'A' -> module is 1
+		  if ((modulein[0] == 'a') || (modulein[0] == 'A')) {
+					 global.module=0x41; // ascii 'A'
+		  }; // end if
+
+		  // check first character, if 'b' or 'B' -> module is 2
+		  if ((modulein[0] == 'b') || (modulein[0] == 'B')) {
+					 global.module=0x42; // ascii 'B'
+		  }; // end if
+
+		  // check first character, if 'c' or 'C' -> module is 3
+		  if ((modulein[0] == 'c') || (modulein[0] == 'C')) {
+					 global.module=0x43; // ascii 'C'
+		  }; // end if
+
+		  if (global.module == 0) {
+					 fprintf(stderr,"Error: module must be 'a', 'b' or 'c'\n");
+					 fprintf(stderr,"Modulein is %X \n",modulein[0]);
+					 usage(argv[0]);
+					 exit(-1);
+		  }; // end if
+
+		  // check destination port. Has been extracted using a "atoi" (convert string
 // to number) function, but was it a valid string?
 // convert destport back to string and see if we get the same thing
 // we started with
@@ -504,9 +518,24 @@ if ((info->ai_next != NULL) || global.verboselevel >= 1) {
 }; // end if
 
 // store address info for "s_udpsend" function
+// open a UDP socket and store information in the global data structure
 global.ai_addr=info->ai_addr;
 
+if (info->ai_family == AF_INET) {
+	// ipv4
+	v4orv6=0;
+	global.udpsd=socket(AF_INET,SOCK_DGRAM,0);
+} else {
+	// ipv6
+	v4orv6=1;
+	global.udpsd=socket(AF_INET6,SOCK_DGRAM,0);
+}; // end else - if
 
+
+if (global.udpsd < 0) {
+	fprintf(stderr,"Error: could not create udp socket! Exiting!\n");
+	exit(-1);
+}; // end if
 // check "break" values
 if (breakintervalstrin != NULL) {
 	snprintf(breakintervalstr,10,"%d",global.breakinterval);
@@ -587,7 +616,13 @@ if (mycallin != NULL) {
 
 	
 	memset(global.mycall,' ',6);
-	memcpy(global.mycall,mycallin,calllen);
+
+	// copy "mycall", also make upper case
+	{ int l;
+		for (l=0; l<calllen;l++) {
+			global.mycall[l]=toupper(mycallin[l]);
+		}; // end for
+	}; // end loop
 
 } else {
 	// mycall is mandatory when the -dxl option is set
@@ -654,14 +689,113 @@ status=0;
 
 
 
-// open a UDP socket and store information in the global data structure
-global.udpsd=socket(AF_INET6,SOCK_DGRAM,0);
 
-if (global.udpsd < 0) {
-	fprintf(stderr,"Error: could not create udp socket! Exiting!\n");
-	exit(-1);
-}; // end if
 
+// bind to local ip-address
+if (global.sourceip) {
+	int ret;
+	struct addrinfo *si_hint, *si_info;
+
+	// error checking
+	if (v4orv6 < 0) {
+		fprintf(stderr,"Error: invalid value for v4orv6 to bind local address: %d!\n",v4orv6);
+		exit(-1);
+	}; // end if
+
+
+	// allocate memory for "sockaddr_in" structure for sourceip
+	if (v4orv6) {
+		// ipv6
+		sourceip_addr=malloc(sizeof(struct sockaddr_in6));
+	} else {
+		// ipv4
+		sourceip_addr=malloc(sizeof(struct sockaddr_in));
+	}; // end else - if
+
+	if (!sourceip_addr) {
+		fprintf(stderr,"Internal Error: malloc failed for sourceip_addr!\n");
+		exit(-1);
+	}; // end if
+
+
+	// allocate memory for hint
+	si_hint=malloc(sizeof(struct addrinfo));
+
+	if (!si_hint) {
+		fprintf(stderr,"Internal Error: malloc failed for hint!\n");
+		exit(-1);
+	}; // end if
+
+	// clear hint
+	memset(si_hint,0,sizeof(si_hint));
+
+
+	// fill in "hint"
+	si_hint->ai_socktype = SOCK_DGRAM;
+
+	if (v4orv6) {
+		si_hint->ai_family = AF_INET6;
+	} else {
+		si_hint->ai_family = AF_INET;
+	}; // end else - if
+
+	// do DNS-query, use getaddrinfo for both ipv4 and ipv6 support
+	ret=getaddrinfo(global.sourceip, NULL, si_hint, &si_info);
+
+	if (ret) {
+		fprintf(stderr,"Error: cannot resolve local ip-address %s. Reason: %d (%s)\n",global.sourceip,ret,gai_strerror(ret));
+		exit(-1);
+	}; // end if
+
+	// getaddrinfo can return multiple results, we only use the first one
+
+	// give warning is more then one result found.
+	// Data is returned in info as a linked list
+	// If the "next" pointer is not NULL, there is more then one
+	// element in the chain
+
+	if ((si_info->ai_next != NULL) || global.verboselevel >= 1) {
+		char ipaddrtxt[INET6_ADDRSTRLEN];
+
+		// get ip-address in numeric form
+		if (si_info->ai_family == AF_INET) {
+			// ipv4
+			struct sockaddr_in *sin;
+			sin = (struct sockaddr_in *) si_info->ai_addr;
+			inet_ntop(AF_INET,&sin->sin_addr,ipaddrtxt,INET6_ADDRSTRLEN);
+		} else {
+			// ipv6
+			struct sockaddr_in6 *sin;
+			sin = (struct sockaddr_in6 *) si_info->ai_addr;
+			inet_ntop(AF_INET6,&sin->sin6_addr,ipaddrtxt,INET6_ADDRSTRLEN);
+		}; // end else - if
+
+		if (si_info->ai_next != NULL) {
+			fprintf(stderr,"Warning. Multiple ip addresses found for local address %s. Using %s\n",destination,ipaddrtxt);
+		} else {
+			fprintf(stderr,"Using local ip-address %s\n",ipaddrtxt);
+		}; // end if
+
+		sourceip_addr=(struct sockaddr_in *) si_info->ai_addr;
+
+		if (si_info->ai_family == AF_INET) {
+			ret=bind(global.udpsd,(const struct sockaddr *) sourceip_addr, sizeof(struct sockaddr_in));
+			if (ret < 0) {
+				fprintf(stderr,"Could not bind to local address %s: error %d (%s)\n",global.sourceip,errno,strerror(errno));
+			}; // end if
+
+		} else {
+			ret=bind(global.udpsd,(const struct sockaddr *) sourceip_addr, sizeof(struct sockaddr_in6));
+			if (ret < 0) {
+				fprintf(stderr,"Could not bind to local address %s: error %d (%s)\n",global.sourceip,errno,strerror(errno));
+			}; // end if
+
+		}; // end else - if
+
+	}; // end if (more then one result, or "verbose" is set)
+
+	free(hint);
+}; // end if (there is a source address)
 
 // We first set up the dextra link, before starting the DVdongle; as
 // otherwize, the dongle can timeout due to not receiving any data during

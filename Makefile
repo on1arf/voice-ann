@@ -1,16 +1,16 @@
 ALL: wav2ambe wavstream ambe2wav cp2dpl ambestream
 
 
-wav2ambe: wav2ambe.c crc.h serialframe.h serialreceive.h serialsend.h wav2ambe.h
+wav2ambe: wav2ambe.c crc.h serialframe.h serialreceive.h serialsend.h wav2ambe.h usageandhelp.h
 	 gcc -Wall -o wav2ambe -lpthread -lsndfile -lrt wav2ambe.c
 
-ambe2wav: ambe2wav.c crc.h serialframe.h serialreceive.h serialsend.h readambefile.h wav2ambe.h
+ambe2wav: ambe2wav.c crc.h serialframe.h serialreceive.h serialsend.h readambefile.h wav2ambe.h usageandhelp.h
 	 gcc -Wall -o ambe2wav -lpthread -lsndfile -lrt ambe2wav.c
 
-wavstream: wavstream.c crc.h serialframe.h s_serialreceive.h s_serialsend.h s_udpsend.h wavstream.h
+wavstream: wavstream.c crc.h serialframe.h s_serialreceive.h s_serialsend.h s_udpsend.h wavstream.h usageandhelp.h
 	gcc -Wall -o wavstream -lpthread -lsndfile -lrt wavstream.c
 
-ambestream: ambestream.c crc.h serialframe.h s_serialreceive.h s_serialsend.h s_udpsend.h ambestream.h
+ambestream: ambestream.c crc.h serialframe.h s_serialreceive.h s_serialsend.h s_udpsend.h ambestream.h usageandhelp.h
 	gcc -Wall -o ambestream -lrt ambestream.c
 
 cp2dpl: cp2dpl.c

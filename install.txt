@@ -60,14 +60,15 @@ Do NOT forget this option, as otherwize the package will be installed under /usr
 - locate the source-code on http://villazeebries.krbonne.net/hamstuff/
 
 - download the latest source-file:
-(in this case, version 0.2.1)
--> wget http://villazeebries.krbonne.net/dstar/voice-announce/voice-announce-0.2.1.tar.gz
+(in this case, version 0.2.2)
+-> wget http://villazeebries.krbonne.net/dstar/voice-announce/voice-announce-0.2.2.tar.gz
+Or grab the latest version from github:
+https://github.com/on1arf/voice-ann
 
 - unzip and extract
--> tar zxvf voice-announce-0.2.1.tar.gz
+-> tar zxvf voice-announce-0.2.2.tar.gz
 
 - compile and install
--> cd voice-announce-0.2.1
 -> make
 -> make install
 

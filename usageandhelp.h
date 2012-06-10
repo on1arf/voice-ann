@@ -64,7 +64,7 @@ void help (char * progname) {
 
 #ifdef AMBESTREAM
 void usage (char * progname) {
-fprintf(stderr,"Usage: %s [-t broadcasttext] [-v] [-4|-6] [-dxl] [-my CALLSIGN] [-d destination ] [-p port] [ -bi break-interval ] [ -bl break-length ] [ -br break-repeat ] name-of-repeater module infile.dvtool [ infile.ambe ....] \n",progname);
+fprintf(stderr,"Usage: %s [-si sourceipaddress] [-t broadcasttext] [-v] [-4|-6] [-dxl] [-my CALLSIGN] [-d destination ] [-p port] [ -bi break-interval ] [ -bl break-length ] [ -br break-repeat ] name-of-repeater module infile.dvtool [ infile.ambe ....] \n",progname);
 fprintf(stderr,"Usage: %s -h \n",progname);
 fprintf(stderr,"Usage: %s -V \n",progname);
 
@@ -77,6 +77,7 @@ void help (char * progname) {
 	fprintf(stderr,"Usage: %s [-t broadcasttext] [-v] [-4|-6] [-dxl] [-my CALLSIGN] [-d destination ] [-p port] [ -bi break-interval ] [ -bl break-length ] [ -br break-repeat ] name-of-repeater module infile.dvtool [ infile.ambe ....] \n",progname);
 	fprintf(stderr,"\n");
 	fprintf(stderr,"CLI Options:\n");
+	fprintf(stderr,"-si: source ip-address \n");
 	fprintf(stderr,"-t: text-message included in DV-stream\n");
 	fprintf(stderr,"-v: verbose\n");
 	fprintf(stderr,"-d: destination ip-address or host (default value is 127.0.0.1)\n");
@@ -117,7 +118,7 @@ void help (char * progname) {
 #ifdef WAVSTREAM
 void usage (char * progname) {
 
-	fprintf(stderr,"Usage: %s [-t broadcasttext] [-dngl device] [-v] [-4] [-6] [-d ipaddress ] [-p port] [-my CALLSIGN] [-bi break-interval] [-bl break-length] [-br break-repeat] name-of-repeater module infile.wav [ infile.wav ....]\n",progname);
+	fprintf(stderr,"Usage: %s [-sip sourceip] [-t broadcasttext] [-dngl device] [-v] [-4] [-6] [-d ipaddress ] [-p port] [-my CALLSIGN] [-bi break-interval] [-bl break-length] [-br break-repeat] name-of-repeater module infile.wav [ infile.wav ....]\n",progname);
 	fprintf(stderr,"Usage: %s -h \n",progname);
 	fprintf(stderr,"Usage: %s -V \n",progname);
 
@@ -130,6 +131,7 @@ void help (char * progname) {
 	fprintf(stderr,"Usage: %s [-t broadcasttext] [-dngl device] [-v] [-4] [-6] [-d ipaddress ] [-p port] [-my CALLSIGN] [-bi break-interval] [-bl break-length] [-br break-repeat] name-of-repeater module infile.wav [ infile.wav ....]\n",progname);
 	fprintf(stderr,"\n");
 	fprintf(stderr,"CLI Options:\n");
+	fprintf(stderr,"-sip: source IP-address\n");
 	fprintf(stderr,"-dngl: DVdongle serial device (Default: /dev/ttyUSB0).\n");
 	fprintf(stderr,"-t: text to be included in the \"slow-speed data\" part of the DV streamfile.\n");
 	fprintf(stderr,"-v : verbose\n");

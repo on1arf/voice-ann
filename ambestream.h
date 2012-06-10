@@ -73,8 +73,12 @@ int breakrepeat;
 
 char mycall[7];
 
+char * sourceip;
+struct sockaddr_in * sourceip_addr;
+
 // socket
 int udpsd;
+
 } globaldatastr; // define global data structure
 
 globaldatastr global; // the global data itself

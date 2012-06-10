@@ -111,6 +111,9 @@ int breakrepeat;
 // dextra
 int linktodextra;
 
+// source ip address
+char * sourceip;
+
 } globalstr; // posix thread global data structure
 
 // we just created the structure, now use it
