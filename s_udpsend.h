@@ -167,6 +167,7 @@ if (done == 0) {
 				// with a minimum of 8
 				// if the broadcast message is repeated to fast, some radios do not show it completely
 				// on the display
+				// code proposed by Ken KE2N. thanks :-)
 				if (bcmsglen < 4) {
 					superframewrapsize=8;
 				} else {
