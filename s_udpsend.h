@@ -32,6 +32,8 @@ static int framesmissed=0;
 static int done=0;
 static int slowdataframeid;
 
+static int superframewrapsize=8; // number of superframes after which a broadcast-message is repeater
+
 // counters for frames.
 static int voiceframecounter=0;
 
@@ -119,8 +121,6 @@ if (done == 0) {
 		struct timeval now;
 		struct timezone tz;
 
-		int bcmsglen;
-
 		init=1;
 
 		if (networkinit == 0) {
@@ -154,12 +154,23 @@ if (done == 0) {
 
 			} else {
 				int bytesleft, loop; // needed below
+				int bcmsglen;
 
 				bcmsglen=strlen(global.bcmsg);
 
 				if (bcmsglen > 20) {
 				// length is maximum 20 bytes
 					bcmsglen=20;
+				}; // end if
+
+				// set the superframe wrapsize to twice the length of the broadcast message
+				// with a minimum of 8
+				// if the broadcast message is repeated to fast, some radios do not show it completely
+				// on the display
+				if (bcmsglen < 4) {
+					superframewrapsize=8;
+				} else {
+					superframewrapsize = bcmsglen << 1; // left shift 1 = multiply by 2
 				}; // end if
 
 				slowdataframeid=0;
@@ -559,12 +570,12 @@ if (done == 0) {
 
 		// If at 0, send broadcast-text slow-speed data
 		// If at >0, send filler slow-speed data
-		// Wrap at 8, so the broadcast-text will be repeated every 8 superframe
+		// Wrap at "superframe wrap size", so the broadcast-text will be repeated
 
 		if (slowdataframeid >= 0) {
 			slowdataframeid++;
 
-			if (slowdataframeid >= 8) {
+			if (slowdataframeid >= superframewrapsize) {
 				slowdataframeid=0;
 			}; // end if
 		}; 
